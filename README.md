@@ -1,5 +1,5 @@
-# 📊 금융 이벤트 인텔리전스 (FX + 섹터)
-### Financial Event Intelligence System  
+# 📊 Financial Event Intelligence System 
+### 금융 이벤트 인텔리전스 (FX + 섹터)
 **News → FX Signal → Sector Impact → Heatmap**
 
 ![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
