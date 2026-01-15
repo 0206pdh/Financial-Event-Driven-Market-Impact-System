@@ -1,3 +1,126 @@
+# 📊 금융 이벤트 인텔리전스 (FX + 섹터)
+### Financial Event Intelligence System  
+**News → FX Signal → Sector Impact → Heatmap**
+
+![Python](https://img.shields.io/badge/Python-3.11+-3776AB?style=for-the-badge&logo=python&logoColor=white)
+![FastAPI](https://img.shields.io/badge/FastAPI-Backend-009688?style=for-the-badge&logo=fastapi&logoColor=white)
+![Postgres](https://img.shields.io/badge/PostgreSQL-Database-4169E1?style=for-the-badge&logo=postgresql&logoColor=white)
+![LLM](https://img.shields.io/badge/LLM-Event%20Interpretation-purple?style=for-the-badge)
+![RuleEngine](https://img.shields.io/badge/Rule--Based-Scoring-critical?style=for-the-badge)
+![Explainable](https://img.shields.io/badge/Explainable-Design-success?style=for-the-badge)
+
+---
+
+## 📌 프로젝트 개요
+
+본 프로젝트는 **금융 뉴스 이벤트를 구조적으로 해석**하여  
+**FX 방향성(FX bias)** 과 **섹터 영향(Sector pressure)** 을  
+**룰 기반 점수(rule-based scoring)** 로 계산하고,  
+이를 **대시보드(타임라인 + 히트맵)** 로 시각화하는 시스템이다.
+
+이 프로젝트의 목적은 **가격 예측이 아니라** 다음에 있다.
+
+> **“왜 이 뉴스가, 이 통화와 이 섹터에 영향을 줄 수 있는가?”**
+
+### 핵심 설계 원칙
+
+- ❌ LLM에게 가격·수익률·퍼센트 예측을 맡기지 않음
+- ❌ 단일 기사 기반의 정량 예측 금지
+- ✅ LLM은 **이벤트 해석과 분류만 담당**
+- ✅ 실제 결정은 **룰 엔진이 담당**
+- ✅ 모든 결과는 **설명 가능(Explainable)** 해야 함
+
+---
+
+## 🧠 시스템 접근 방식
+
+이 시스템은 다음과 같은 역할 분리를 따른다.
+
+| 구성 요소 | 역할 |
+|---|---|
+| 뉴스 수집 | 원문 데이터 확보 |
+| LLM | 이벤트 요약 및 신호 정규화 |
+| Rule Engine | FX bias / 섹터 점수 결정 |
+| DB | 이벤트·스코어 로그 저장 |
+| UI | 타임라인 / 히트맵 시각화 |
+
+> **LLM은 “해석”을 담당하고,  
+Rule Engine은 “결정”을 담당한다.**
+
+---
+
+## 🧩 전체 파이프라인 개요
+
+News Article  
+↓  
+Raw Event Ingest  
+↓  
+LLM Event Normalization  
+↓  
+FX / Risk / Rate / Geo Signals  
+↓  
+Rule Engine Scoring  
+↓  
+FX Bias + Sector Scores  
+↓  
+Timeline & Heatmap Dashboard
+
+
+---
+
+## 📦 구성 요약
+
+- **백엔드 API**: `app/`  
+  - FastAPI
+  - Postgres 연동
+- **정적 UI**: `app/ui/`  
+  - FastAPI에서 `/` 경로로 직접 서빙
+- **프런트 프로토타입**: `src/`  
+  - 현재 실행에는 사용되지 않음 (실험용)
+
+---
+
+## ⚙️ 기술 스택 (Tech Stack)
+
+### Backend
+- **Python 3.11+**
+- **FastAPI**
+- **Uvicorn**
+- **PostgreSQL**
+
+### LLM
+- OpenAI API (`gpt-4o-mini`)
+- OpenAI-compatible Local LLM (Mistral 등)
+
+### Data / Infra
+- RapidAPI (뉴스 수집)
+- 환경 변수 기반 설정 (`.env`)
+
+### Architecture
+- Rule-based Scoring Engine
+- Event-driven Pipeline
+- Explainable Market Intelligence Design
+
+---
+
+## 📋 요구 사항
+
+- Python **3.11+** (권장)
+- PostgreSQL
+
+---
+
+## 🚀 설치 및 실행
+
+### 1️⃣ `.env` 생성
+`.env.example` 파일 참고
+
+### 2️⃣ 의존성 설치
+
+```bash
+pip install -r requirements.txt
+
+
 # 금융 이벤트 인텔리전스 (FX + 섹터)
 
 뉴스를 수집하고 LLM으로 이벤트를 정규화한 뒤, FX 방향성과 섹터 영향을 룰 기반으로 점수화해서 대시보드로 보여주는 프로젝트입니다. FastAPI가 백엔드와 정적 UI를 함께 제공합니다.
