@@ -6,6 +6,7 @@ from datetime import datetime
 from psycopg.rows import dict_row
 
 from app.models import NormalizedEvent, ScoredEvent
+from app.rules.weights import ALL_SECTORS
 from app.store.db import get_db
 
 
@@ -24,8 +25,8 @@ def save_normalized(event: NormalizedEvent) -> None:
     cur.execute(
         """
         INSERT INTO normalized_events
-        (raw_event_id, event_type, policy_domain, risk_signal, rate_signal, geo_signal, sector_impacts, sentiment, rationale)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+        (raw_event_id, event_type, policy_domain, risk_signal, rate_signal, geo_signal, sector_impacts, sentiment, rationale, channels, confidence, regime, baseline)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (raw_event_id) DO UPDATE SET
             event_type = EXCLUDED.event_type,
             policy_domain = EXCLUDED.policy_domain,
@@ -34,7 +35,11 @@ def save_normalized(event: NormalizedEvent) -> None:
             geo_signal = EXCLUDED.geo_signal,
             sector_impacts = EXCLUDED.sector_impacts,
             sentiment = EXCLUDED.sentiment,
-            rationale = EXCLUDED.rationale
+            rationale = EXCLUDED.rationale,
+            channels = EXCLUDED.channels,
+            confidence = EXCLUDED.confidence,
+            regime = EXCLUDED.regime,
+            baseline = EXCLUDED.baseline
         """,
         (
             event.raw_event_id,
@@ -46,6 +51,10 @@ def save_normalized(event: NormalizedEvent) -> None:
             json.dumps(event.sector_impacts, ensure_ascii=True),
             event.sentiment,
             event.rationale,
+            json.dumps(event.channels, ensure_ascii=True),
+            event.confidence,
+            json.dumps(event.regime, ensure_ascii=True),
+            json.dumps(event.baseline, ensure_ascii=True),
         ),
     )
     conn.commit()
@@ -81,6 +90,10 @@ def fetch_unscored_events(limit: int = 200) -> list[NormalizedEvent]:
                 sector_impacts=row["sector_impacts"],
                 sentiment=row["sentiment"],
                 rationale=row["rationale"],
+                channels=row.get("channels") or [],
+                confidence=row.get("confidence", 0.6),
+                regime=row.get("regime") or {},
+                baseline=row.get("baseline") or {},
             )
         )
     return events
@@ -93,8 +106,8 @@ def save_scored(event: ScoredEvent) -> None:
         """
         INSERT INTO scored_events
         (raw_event_id, event_type, policy_domain, risk_signal, rate_signal, geo_signal, sector_impacts, sentiment, rationale,
-         fx_state, sector_scores, total_score, created_at)
-        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
+         fx_state, sector_scores, total_score, created_at, channels, confidence, regime, baseline)
+        VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s)
         ON CONFLICT (raw_event_id) DO UPDATE SET
             event_type = EXCLUDED.event_type,
             policy_domain = EXCLUDED.policy_domain,
@@ -107,7 +120,11 @@ def save_scored(event: ScoredEvent) -> None:
             fx_state = EXCLUDED.fx_state,
             sector_scores = EXCLUDED.sector_scores,
             total_score = EXCLUDED.total_score,
-            created_at = EXCLUDED.created_at
+            created_at = EXCLUDED.created_at,
+            channels = EXCLUDED.channels,
+            confidence = EXCLUDED.confidence,
+            regime = EXCLUDED.regime,
+            baseline = EXCLUDED.baseline
         """,
         (
             event.raw_event_id,
@@ -123,6 +140,10 @@ def save_scored(event: ScoredEvent) -> None:
             json.dumps(event.sector_scores, ensure_ascii=True),
             event.total_score,
             event.created_at,
+            json.dumps(event.channels, ensure_ascii=True),
+            event.confidence,
+            json.dumps(event.regime, ensure_ascii=True),
+            json.dumps(event.baseline, ensure_ascii=True),
         ),
     )
     conn.commit()
@@ -164,26 +185,21 @@ def list_timeline(limit: int = 50) -> list[dict[str, object]]:
     ]
 
 
-def sector_heatmap() -> dict[str, int]:
+def sector_heatmap() -> dict[str, float]:
     conn = get_db()
     cur = conn.cursor(row_factory=dict_row)
     cur.execute("SELECT sector_scores FROM scored_events")
     rows = cur.fetchall()
     conn.close()
 
-    totals: dict[str, int] = {}
+    totals: dict[str, float] = {}
     for row in rows:
         scores = row["sector_scores"]
         for sector, score in scores.items():
-            totals[sector] = totals.get(sector, 0) + int(score)
-    if not totals:
-        return {
-            "Energy": 1,
-            "Defense": 1,
-            "Financials": -1,
-            "Technology": -1,
-        }
-    return totals
+            totals[sector] = totals.get(sector, 0.0) + float(score)
+    for sector in ALL_SECTORS:
+        totals.setdefault(sector, 0.0)
+    return {sector: round(value, 3) for sector, value in totals.items()}
 
 
 def graph_edges(limit: int = 100) -> list[dict[str, object]]:
@@ -214,7 +230,7 @@ def graph_edges(limit: int = 100) -> list[dict[str, object]]:
                     "rate_signal": row["rate_signal"],
                     "geo_signal": row["geo_signal"],
                     "sector": sector,
-                "weight": int(score),
+                    "weight": float(score),
                     "fx_theme": row["fx_state"],
                 }
             )

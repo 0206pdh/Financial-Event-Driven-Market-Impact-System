@@ -7,6 +7,7 @@ const fxChartEl = document.getElementById("fxChart");
 const marketHeatmapEl = document.getElementById("marketHeatmap");
 const fxPredictionEl = document.getElementById("fxPrediction");
 let selectedNewsId = "";
+let lastHeatmapScores = {};
 
 async function fetchJson(path, options = {}) {
   const response = await fetch(path, options);
@@ -147,7 +148,7 @@ function parseFxState(state) {
     if (!key || value === undefined) {
       return;
     }
-    const parsed = Number.parseInt(value, 10);
+    const parsed = Number.parseFloat(value);
     if (!Number.isNaN(parsed) && key in result) {
       result[key] = parsed;
     }
@@ -171,19 +172,20 @@ function renderFxPrediction(items) {
   card.className = "fx-card";
   card.innerHTML = `
     <h3>${latest.title || "Latest event"}</h3>
-    <div class="fx-meta">${latest.risk_signal}/${latest.rate_signal}/${latest.geo_signal} · ${latest.published_at}</div>
+    <div class="fx-meta"></div>
   `;
   ["USD", "JPY", "EUR", "EM"].forEach((currency) => {
     const value = bias[currency] || 0;
-    const width = Math.round((Math.abs(value) / maxAbs) * 100);
+    const width = Math.round((Math.abs(value) / maxAbs) * 50);
     const row = document.createElement("div");
     row.className = "fx-row";
+    const displayValue = value.toFixed(2);
     row.innerHTML = `
       <div>${currency}</div>
       <div class="fx-bar">
         <div class="fx-bar-fill ${value > 0 ? "positive" : value < 0 ? "negative" : "neutral"}" style="width: ${width}%"></div>
       </div>
-      <div>${value >= 0 ? `+${value}` : value}</div>
+      <div>${value >= 0 ? `+${displayValue}` : displayValue}</div>
     `;
     card.appendChild(row);
   });
@@ -199,6 +201,8 @@ async function refresh() {
     ]);
     renderTimeline(timeline);
     renderHeatmap(heatmap);
+    lastHeatmapScores = heatmap || {};
+    renderMarketHeatmap(lastHeatmapScores);
     renderFxPrediction(timeline);
     renderCategories(categories);
     setStatus("Views refreshed.");
@@ -269,39 +273,6 @@ const fxData = [
   { quarter: "Q4 2025", fxSwaps: 4158, spotFX: 1180, forwards: 1425, nonTraditional: 306 },
 ];
 
-const marketHeatmapData = [
-  { name: "Reliance Industries", ticker: "RELIANCE", size: 1650000, change: 1.8, sector: "Energy" },
-  { name: "HDFC Bank", ticker: "HDFCBANK", size: 1200000, change: -0.5, sector: "Banking" },
-  { name: "ICICI Bank", ticker: "ICICIBANK", size: 780000, change: 2.3, sector: "Banking" },
-  { name: "Infosys", ticker: "INFY", size: 720000, change: -1.2, sector: "IT" },
-  { name: "TCS", ticker: "TCS", size: 1400000, change: 0.8, sector: "IT" },
-  { name: "ITC", ticker: "ITC", size: 620000, change: -2.1, sector: "FMCG" },
-  { name: "Bharti Airtel", ticker: "BHARTIARTL", size: 580000, change: 3.2, sector: "Telecom" },
-  { name: "Kotak Mahindra Bank", ticker: "KOTAKBANK", size: 380000, change: 1.1, sector: "Banking" },
-  { name: "HUL", ticker: "HINDUNILVR", size: 550000, change: -0.3, sector: "FMCG" },
-  { name: "State Bank of India", ticker: "SBIN", size: 520000, change: 2.8, sector: "Banking" },
-  { name: "Axis Bank", ticker: "AXISBANK", size: 340000, change: 1.5, sector: "Banking" },
-  { name: "Larsen & Toubro", ticker: "LT", size: 480000, change: -1.8, sector: "Infrastructure" },
-  { name: "Asian Paints", ticker: "ASIANPAINT", size: 310000, change: 0.4, sector: "Consumer" },
-  { name: "Wipro", ticker: "WIPRO", size: 280000, change: -0.9, sector: "IT" },
-  { name: "Maruti Suzuki", ticker: "MARUTI", size: 350000, change: 2.1, sector: "Auto" },
-  { name: "Bajaj Finance", ticker: "BAJFINANCE", size: 420000, change: -2.5, sector: "Finance" },
-  { name: "Titan Company", ticker: "TITAN", size: 290000, change: 1.9, sector: "Consumer" },
-  { name: "Tech Mahindra", ticker: "TECHM", size: 180000, change: -1.4, sector: "IT" },
-  { name: "UltraTech Cement", ticker: "ULTRACEMCO", size: 260000, change: 0.6, sector: "Cement" },
-  { name: "Sun Pharma", ticker: "SUNPHARMA", size: 380000, change: 3.5, sector: "Pharma" },
-  { name: "Nestle India", ticker: "NESTLEIND", size: 210000, change: -0.7, sector: "FMCG" },
-  { name: "Power Grid", ticker: "POWERGRID", size: 190000, change: 1.3, sector: "Utilities" },
-  { name: "NTPC", ticker: "NTPC", size: 170000, change: -1.1, sector: "Energy" },
-  { name: "Coal India", ticker: "COALINDIA", size: 150000, change: 2.6, sector: "Energy" },
-  { name: "Tata Steel", ticker: "TATASTEEL", size: 140000, change: -3.2, sector: "Metals" },
-  { name: "JSW Steel", ticker: "JSWSTEEL", size: 130000, change: -2.8, sector: "Metals" },
-  { name: "Adani Ports", ticker: "ADANIPORTS", size: 220000, change: 1.7, sector: "Infrastructure" },
-  { name: "Bajaj Auto", ticker: "BAJAJ-AUTO", size: 160000, change: 0.9, sector: "Auto" },
-  { name: "Grasim", ticker: "GRASIM", size: 120000, change: -0.4, sector: "Diversified" },
-  { name: "Shree Cement", ticker: "SHREECEM", size: 110000, change: 1.2, sector: "Cement" },
-];
-
 function linePath(data, key, width, height, padding) {
   const maxY = 5000;
   const minY = 0;
@@ -365,12 +336,11 @@ function renderFxChart() {
 }
 
 function getHeatmapColor(change) {
-  if (change >= 3) return "#10b981";
-  if (change >= 1.5) return "#34d399";
-  if (change >= 0.5) return "#6ee7b7";
-  if (change >= -0.5) return "#374151";
-  if (change >= -1.5) return "#fb923c";
-  if (change >= -2.5) return "#f87171";
+  if (change >= 2) return "#10b981";
+  if (change >= 1) return "#34d399";
+  if (change > -1) return "#374151";
+  if (change >= -2) return "#fb923c";
+  if (change >= -3) return "#f87171";
   return "#ef4444";
 }
 
@@ -444,21 +414,26 @@ function squarify(items, x, y, width, height) {
   return rects;
 }
 
-function renderMarketHeatmap() {
+function renderMarketHeatmap(scores) {
   if (!marketHeatmapEl) {
+    return;
+  }
+  const entries = Object.entries(scores || {}).filter(([, value]) => Number.isFinite(value));
+  if (!entries.length) {
+    marketHeatmapEl.innerHTML = "<div class=\"heatmap-empty\">No sector scores yet.</div>";
     return;
   }
   const bounds = marketHeatmapEl.getBoundingClientRect();
   const width = bounds.width || 900;
   const height = bounds.height || 560;
-  const totalSize = marketHeatmapData.reduce((sum, item) => sum + item.size, 0);
-  const items = marketHeatmapData
-    .slice()
-    .sort((a, b) => b.size - a.size)
-    .map((item) => ({
-      ...item,
-      area: (item.size / totalSize) * width * height,
-    }));
+  const totalSize = entries.reduce((sum, [, value]) => sum + Math.max(0.1, Math.abs(value)), 0);
+  const items = entries
+    .map(([sector, value]) => ({
+      sector,
+      value,
+      area: (Math.max(0.1, Math.abs(value)) / totalSize) * width * height,
+    }))
+    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
   const rects = squarify(items, 0, 0, width, height);
   marketHeatmapEl.innerHTML = "";
   rects.forEach((rect) => {
@@ -468,19 +443,25 @@ function renderMarketHeatmap() {
     div.style.top = `${rect.y}px`;
     div.style.width = `${rect.width}px`;
     div.style.height = `${rect.height}px`;
-    div.style.background = getHeatmapColor(rect.change);
-    const canShow = rect.width > 70 && rect.height > 45;
-    const showChange = rect.width > 90 && rect.height > 60;
-    div.innerHTML = canShow
-      ? `${rect.ticker}${showChange ? `<small>${rect.change > 0 ? "+" : ""}${rect.change.toFixed(2)}%</small>` : ""}`
-      : "";
+    div.style.background = getHeatmapColor(rect.value);
+    const formatted = rect.value >= 0 ? `+${rect.value.toFixed(3)}` : rect.value.toFixed(3);
+    const label = `${rect.sector}`;
+    const maxLabelWidth = Math.max(1, rect.width - 12);
+    const maxLabelHeight = Math.max(1, rect.height - 12);
+    const approxFont = Math.min(
+      14,
+      Math.max(9, Math.floor(Math.min(maxLabelWidth / Math.max(6, label.length * 0.6), maxLabelHeight / 3)))
+    );
+    div.style.fontSize = `${approxFont}px`;
+    div.title = `${rect.sector} ${formatted}`;
+    div.innerHTML = `${label}<small>${formatted}</small>`;
     marketHeatmapEl.appendChild(div);
   });
 }
 
 renderFxChart();
-renderMarketHeatmap();
+renderMarketHeatmap(lastHeatmapScores);
 window.addEventListener("resize", () => {
   renderFxChart();
-  renderMarketHeatmap();
+  renderMarketHeatmap(lastHeatmapScores);
 });

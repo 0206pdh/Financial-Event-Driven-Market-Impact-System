@@ -3,27 +3,27 @@ from __future__ import annotations
 from datetime import datetime
 
 from app.models import NormalizedEvent, ScoredEvent
-from app.rules.weights import FX_BIAS_RULES, FX_SECTOR_RULES, RISK_SECTOR_RULES
+from app.rules.weights import (
+    FX_TRANSMISSION_CHANNELS,
+    apply_risk_sector_rules,
+    combine_baseline_delta,
+    compute_fx_delta,
+    compute_sector_delta_from_fx,
+)
 
 
 def score_event(event: NormalizedEvent) -> ScoredEvent:
-    fx_bias = _derive_fx_bias(event.risk_signal, event.rate_signal, event.geo_signal)
-    fx_state = _format_fx_state(fx_bias)
-    fx_signals = _derive_fx_signals(fx_bias)
-    sector_scores: dict[str, int] = {}
-    risk_key = event.risk_signal.lower()
-    for sector, score in RISK_SECTOR_RULES.get(risk_key, {}).items():
-        sector_scores[sector] = sector_scores.get(sector, 0) + score
+    channels = _normalize_channels(event)
+    confidence = _normalize_confidence(event.confidence)
+    regime = _normalize_regime(event.regime)
+    baseline = event.baseline or {}
 
-    for signal in fx_signals:
-        for sector, score in FX_SECTOR_RULES.get(signal, {}).items():
-            sector_scores[sector] = sector_scores.get(sector, 0) + score
-
-    for sector, score in event.sector_impacts.items():
-        event_weight = _event_weight(score)
-        if event_weight:
-            sector_scores[sector] = sector_scores.get(sector, 0) + event_weight
-
+    fx_delta = compute_fx_delta(channels, confidence)
+    fx_state = _format_fx_state(fx_delta)
+    sector_delta = compute_sector_delta_from_fx(fx_delta)
+    sector_delta = apply_risk_sector_rules(sector_delta, channels, confidence)
+    sector_delta = _apply_event_impacts(sector_delta, event.sector_impacts, confidence)
+    sector_scores = combine_baseline_delta(baseline, sector_delta, regime)
     total_score = sum(sector_scores.values())
 
     return ScoredEvent(
@@ -43,70 +43,70 @@ def score_event(event: NormalizedEvent) -> ScoredEvent:
     )
 
 
-def _derive_fx_bias(risk_signal: str, rate_signal: str, geo_signal: str) -> dict[str, int]:
-    bias = {"USD": 0, "JPY": 0, "EUR": 0, "EM": 0}
-    risk_key = risk_signal.lower()
-    rate_key = rate_signal.lower()
-    geo_key = geo_signal.lower()
+def _normalize_channels(event: NormalizedEvent) -> list[str]:
+    channels = [ch for ch in (event.channels or []) if ch in FX_TRANSMISSION_CHANNELS]
+    channels = list(dict.fromkeys(channels))
+    for ch in _signal_channels(event):
+        if ch in FX_TRANSMISSION_CHANNELS and ch not in channels:
+            channels.append(ch)
+    return channels
 
-    for key in (risk_key, _rate_key(rate_key), _geo_key(geo_key)):
-        if not key:
+
+def _signal_channels(event: NormalizedEvent) -> list[str]:
+    channels: list[str] = []
+    if event.risk_signal:
+        channels.append(event.risk_signal.lower())
+    if event.rate_signal == "tightening":
+        channels.append("rate_tightening")
+    if event.rate_signal == "easing":
+        channels.append("rate_easing")
+    if event.geo_signal == "escalation":
+        channels.append("geo_escalation")
+    if event.geo_signal == "deescalation":
+        channels.append("geo_deescalation")
+    return channels
+
+
+def _normalize_confidence(value: float | int | None) -> float:
+    if value is None:
+        return 0.6
+    try:
+        confidence = float(value)
+    except (TypeError, ValueError):
+        return 0.6
+    return max(0.0, min(1.0, confidence))
+
+
+def _normalize_regime(value: dict[str, str] | None) -> dict[str, str]:
+    if not isinstance(value, dict):
+        return {"risk_sentiment": "neutral", "volatility": "elevated", "liquidity": "neutral"}
+    return {
+        "risk_sentiment": value.get("risk_sentiment", "neutral"),
+        "volatility": value.get("volatility", "elevated"),
+        "liquidity": value.get("liquidity", "neutral"),
+    }
+
+
+def _apply_event_impacts(
+    sector_delta: dict[str, float],
+    impacts: dict[str, int],
+    confidence: float,
+) -> dict[str, float]:
+    for sector, score in impacts.items():
+        try:
+            delta = float(score) * confidence
+        except (TypeError, ValueError):
             continue
-        for currency, score in FX_BIAS_RULES.get(key, {}).items():
-            bias[currency] += score
-    return bias
+        sector_delta[sector] = sector_delta.get(sector, 0.0) + delta
+    return sector_delta
 
 
-def _rate_key(value: str) -> str | None:
-    if value == "tightening":
-        return "rate_tightening"
-    if value == "easing":
-        return "rate_easing"
-    return None
-
-
-def _geo_key(value: str) -> str | None:
-    if value == "escalation":
-        return "geo_escalation"
-    if value == "deescalation":
-        return "geo_deescalation"
-    return None
-
-
-def _derive_fx_signals(bias: dict[str, int]) -> list[str]:
-    signals: list[str] = []
-    usd = bias.get("USD", 0)
-    jpy = bias.get("JPY", 0)
-    eur = bias.get("EUR", 0)
-    em = bias.get("EM", 0)
-
-    if usd > 0:
-        signals.append("USD_up")
-    elif usd < 0:
-        signals.append("USD_down")
-    if jpy > 0:
-        signals.append("JPY_up")
-    if eur > 0:
-        signals.append("EUR_up")
-    if em > 0:
-        signals.append("EM_up")
-    return signals
-
-
-def _format_fx_state(bias: dict[str, int]) -> str:
+def _format_fx_state(bias: dict[str, float]) -> str:
     return " ".join(
         [
-            f"USD:{bias.get('USD', 0):+d}",
-            f"JPY:{bias.get('JPY', 0):+d}",
-            f"EUR:{bias.get('EUR', 0):+d}",
-            f"EM:{bias.get('EM', 0):+d}",
+            f"USD:{bias.get('USD', 0.0):+0.2f}",
+            f"JPY:{bias.get('JPY', 0.0):+0.2f}",
+            f"EUR:{bias.get('EUR', 0.0):+0.2f}",
+            f"EM:{bias.get('EM', 0.0):+0.2f}",
         ]
     )
-
-
-def _event_weight(value: int | float) -> int:
-    if value > 0:
-        return 1
-    if value < 0:
-        return -1
-    return 0

@@ -28,6 +28,13 @@ Extract a normalized event JSON with this schema:
   "risk_signal": "risk_on|risk_off|neutral",
   "rate_signal": "tightening|easing|none",
   "geo_signal": "escalation|deescalation|none",
+  "channels": ["string"],
+  "confidence": 0.0,
+  "regime": {{
+    "risk_sentiment": "risk_on|risk_off|neutral",
+    "volatility": "low|elevated|high",
+    "liquidity": "loose|neutral|tight"
+  }},
   "keywords": ["string"],
   "rationale": "string"
 }}
@@ -38,9 +45,12 @@ Constraints:
 - Return exactly one JSON object for the overall event. Do not repeat keys.
 - Always end the response with a closing brace }}.
 - policy_domain must be one of: monetary, fiscal, geopolitics, industry.
-- risk_signal must be one of: risk_on, risk_off, neutral.
-- rate_signal must be one of: tightening, easing, none.
-- geo_signal must be one of: escalation, deescalation, none.
+ - risk_signal must be one of: risk_on, risk_off, neutral.
+ - rate_signal must be one of: tightening, easing, none.
+ - geo_signal must be one of: escalation, deescalation, none.
+ - channels must be selected from: risk_off, risk_on, rate_tightening, rate_easing, geo_escalation, geo_deescalation.
+ - confidence must be between 0 and 1.
+ - regime must include risk_sentiment, volatility, and liquidity with the allowed values above.
  - keywords must be a short list of salient terms from the article.
 - rationale must explicitly justify why risk_signal and geo_signal are chosen based on concrete evidence.
 
@@ -82,6 +92,13 @@ Example output (format only, values must be from allowed lists):
   "risk_signal": "neutral",
   "rate_signal": "none",
   "geo_signal": "none",
+  "channels": ["risk_off"],
+  "confidence": 0.6,
+  "regime": {{
+    "risk_sentiment": "neutral",
+    "volatility": "elevated",
+    "liquidity": "neutral"
+  }},
   "keywords": ["policy", "markets"],
   "rationale": "Article lacks clear macro shocks, so defaults to policy stability."
 }}
@@ -161,8 +178,18 @@ def normalize_event(raw_event: RawEvent) -> NormalizedEvent:
         risk_signal = mapped_risk
     keywords = data.get("keywords") or []
     rationale = str(data.get("rationale", "")).strip()
+    channels = data.get("channels") or []
+    confidence = data.get("confidence", 0.6)
+    regime = data.get("regime") or {}
     logger.info("LLM keywords: %s", keywords)
     logger.info("LLM rationale: %s", rationale if rationale else "(none)")
+    logger.info("LLM channels: %s", channels)
+    logger.info("LLM confidence: %s", confidence)
+    logger.info("LLM regime: %s", regime)
+    try:
+        confidence_value = float(confidence) if confidence is not None else 0.6
+    except (TypeError, ValueError):
+        confidence_value = 0.6
     return NormalizedEvent(
         raw_event_id=raw_event.id,
         event_type=event_type,
@@ -173,6 +200,9 @@ def normalize_event(raw_event: RawEvent) -> NormalizedEvent:
         sector_impacts={k: int(v) for k, v in (data.get("sector_impacts") or {}).items()},
         sentiment=str(data.get("sentiment", "neutral")),
         rationale=rationale,
+        channels=[str(ch) for ch in channels if ch],
+        confidence=confidence_value,
+        regime={str(k): str(v) for k, v in regime.items()} if isinstance(regime, dict) else {},
     )
 
 

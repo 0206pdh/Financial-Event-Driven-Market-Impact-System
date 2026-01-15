@@ -26,6 +26,10 @@ class NormalizedEvent(BaseModel):
     sector_impacts: dict[str, int]
     sentiment: str
     rationale: str
+    channels: list[str] = Field(default_factory=list)
+    confidence: float = 0.6
+    regime: dict[str, str] = Field(default_factory=dict)
+    baseline: dict[str, float] = Field(default_factory=dict)
 
 
 class ScoredEvent(BaseModel):
@@ -39,6 +43,10 @@ class ScoredEvent(BaseModel):
     sentiment: str
     rationale: str
     fx_state: str
-    sector_scores: dict[str, int]
-    total_score: int
+    sector_scores: dict[str, float]
+    total_score: float
     created_at: datetime
+    channels: list[str] = Field(default_factory=list)
+    confidence: float = 0.6
+    regime: dict[str, str] = Field(default_factory=dict)
+    baseline: dict[str, float] = Field(default_factory=dict)

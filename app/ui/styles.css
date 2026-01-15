@@ -332,35 +332,51 @@ main {
 
 .fx-row {
   display: grid;
-  grid-template-columns: 48px 1fr 48px;
+  grid-template-columns: 48px 1fr 56px;
   gap: 10px;
   align-items: center;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
 }
 
 .fx-bar {
+  position: relative;
   height: 10px;
   background: rgba(255, 255, 255, 0.06);
   border-radius: 999px;
   overflow: hidden;
-  position: relative;
+}
+
+.fx-bar::before {
+  content: "";
+  position: absolute;
+  left: 50%;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: rgba(255, 255, 255, 0.2);
 }
 
 .fx-bar-fill {
+  position: absolute;
+  top: 0;
   height: 100%;
   border-radius: inherit;
   transition: width 0.2s ease;
 }
 
 .fx-bar-fill.positive {
+  left: 50%;
   background: linear-gradient(90deg, rgba(74, 158, 255, 0.2), #4a9eff);
 }
 
 .fx-bar-fill.negative {
-  background: linear-gradient(90deg, rgba(255, 74, 158, 0.2), #ff4a9e);
+  right: 50%;
+  background: linear-gradient(270deg, rgba(255, 74, 158, 0.2), #ff4a9e);
 }
 
 .fx-bar-fill.neutral {
+  left: 50%;
+  width: 0;
   background: linear-gradient(90deg, rgba(255, 255, 255, 0.2), #9aa0a6);
 }
 
@@ -415,9 +431,11 @@ main {
   align-items: center;
   justify-content: center;
   text-align: center;
-  font-size: 0.75rem;
   font-weight: 600;
   padding: 6px;
+  line-height: 1.2;
+  word-break: break-word;
+  overflow: hidden;
 }
 
 .treemap-item small {
@@ -425,6 +443,12 @@ main {
   margin-top: 6px;
   font-size: 0.7rem;
   opacity: 0.85;
+}
+
+.heatmap-empty {
+  color: var(--muted);
+  font-size: 0.95rem;
+  padding: 24px;
 }
 
 .heatmap-legend {

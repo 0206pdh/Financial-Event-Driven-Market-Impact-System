@@ -188,7 +188,7 @@ def timeline(limit: int = 50) -> list[dict[str, object]]:
 
 
 @app.get("/heatmap")
-def heatmap() -> dict[str, int]:
+def heatmap() -> dict[str, float]:
     return sector_heatmap()
 
 
