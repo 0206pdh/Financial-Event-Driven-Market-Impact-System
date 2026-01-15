@@ -30,6 +30,14 @@
 - ✅ 실제 결정은 **룰 엔진이 담당**
 - ✅ 모든 결과는 **설명 가능(Explainable)** 해야 함
 
+핵심 설계 원칙 (중요)
+역할	담당
+LLM	이벤트 해석 + FX 전파 채널 선택
+FX Bias Rules	통화 방향성 정규화
+FX → Sector Rules	통화 효과를 섹터로 변환
+Risk Sector Rules	시장 리스크 효과 보정
+Market Regime	증폭 / 감쇠
+Baseline + Delta	최종 히트맵
 ---
 
 ## 🧠 시스템 접근 방식
