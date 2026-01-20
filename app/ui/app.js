@@ -76,6 +76,7 @@ async function loadInsight(rawEventId, fallbackTitle) {
     return;
   }
   setStatus("Loading insight...");
+  const start = performance.now();
   console.log("Loading insight for", rawEventId);
   if (insightSummaryEl) {
     insightSummaryEl.textContent = "요약 생성 중...";
@@ -93,7 +94,9 @@ async function loadInsight(rawEventId, fallbackTitle) {
     const data = await fetchJson(`/events/insight?raw_event_id=${encodeURIComponent(rawEventId)}`);
     console.log("Insight response", data);
     renderInsight(data, fallbackTitle);
-    setStatus("Insight loaded.");
+    const elapsedMs = performance.now() - start;
+    console.log(`Insight UI latency ${elapsedMs.toFixed(0)}ms`);
+    setStatus(`Insight loaded (${(elapsedMs / 1000).toFixed(2)}s)`);
   } catch (err) {
     console.error("Insight error", err);
     renderInsight(
@@ -105,6 +108,8 @@ async function loadInsight(rawEventId, fallbackTitle) {
       },
       fallbackTitle
     );
+    const elapsedMs = performance.now() - start;
+    console.log(`Insight UI error latency ${elapsedMs.toFixed(0)}ms`);
     setStatus(`Insight error: ${err.message}`);
   }
 }

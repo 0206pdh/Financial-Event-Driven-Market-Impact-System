@@ -1,11 +1,15 @@
 from __future__ import annotations
 
 import json
+import time
 from typing import Any
 
 import requests
 
 from app.config import settings
+import logging
+
+logger = logging.getLogger("app.llm.client")
 
 
 class MistralClient:
@@ -31,8 +35,16 @@ class MistralClient:
         headers = {}
         if self.api_key:
             headers["Authorization"] = f"Bearer {self.api_key}"
+        start = time.perf_counter()
         response = requests.post(url, json=payload, timeout=self.timeout, headers=headers)
         response.raise_for_status()
+        elapsed_sec = time.perf_counter() - start
+        logger.info(
+            "LLM request ok provider=%s model=%s latency_s=%.2f",
+            (settings.llm_provider or "local").strip().lower(),
+            self.model,
+            elapsed_sec,
+        )
         return response.json()
 
     def extract_json(self, messages: list[dict[str, str]]) -> dict[str, Any]:

@@ -211,6 +211,9 @@ def graph(limit: int = 100) -> list[dict[str, object]]:
 
 @app.get("/events/insight")
 def event_insight(raw_event_id: str) -> dict[str, str]:
+    import time
+
+    start = time.perf_counter()
     logger.info("Insight request raw_event_id=%s", raw_event_id)
     raw_event = fetch_raw_event(raw_event_id)
     if not raw_event:
@@ -241,6 +244,9 @@ def event_insight(raw_event_id: str) -> dict[str, str]:
     heatmap_reason = generate_heatmap_ko(scored, normalized)
     if not heatmap_reason:
         heatmap_reason = build_heatmap_reason(scored, normalized)
+
+    elapsed_sec = time.perf_counter() - start
+    logger.info("Insight response raw_event_id=%s latency_s=%.2f", raw_event_id, elapsed_sec)
 
     return {
         "id": raw_event.id,
