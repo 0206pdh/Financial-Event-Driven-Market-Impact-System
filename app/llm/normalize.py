@@ -247,3 +247,8 @@ def _details_summary(payload: dict) -> tuple[str, str]:
     if len(summary) > 900:
         summary = summary[:900]
     return (summary, category_url)
+
+
+def extract_details_text(payload: dict) -> str:
+    summary, _ = _details_summary(payload)
+    return summary

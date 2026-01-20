@@ -99,6 +99,31 @@ def fetch_unscored_events(limit: int = 200) -> list[NormalizedEvent]:
     return events
 
 
+def fetch_normalized_event(raw_event_id: str) -> NormalizedEvent | None:
+    conn = get_db()
+    cur = conn.cursor(row_factory=dict_row)
+    cur.execute("SELECT * FROM normalized_events WHERE raw_event_id = %s", (raw_event_id,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return NormalizedEvent(
+        raw_event_id=row["raw_event_id"],
+        event_type=row["event_type"],
+        policy_domain=row["policy_domain"],
+        risk_signal=row["risk_signal"],
+        rate_signal=row["rate_signal"],
+        geo_signal=row["geo_signal"],
+        sector_impacts=row["sector_impacts"],
+        sentiment=row["sentiment"],
+        rationale=row["rationale"],
+        channels=row.get("channels") or [],
+        confidence=row.get("confidence", 0.6),
+        regime=row.get("regime") or {},
+        baseline=row.get("baseline") or {},
+    )
+
+
 def save_scored(event: ScoredEvent) -> None:
     conn = get_db()
     cur = conn.cursor()
@@ -148,6 +173,35 @@ def save_scored(event: ScoredEvent) -> None:
     )
     conn.commit()
     conn.close()
+
+
+def fetch_scored_event(raw_event_id: str) -> ScoredEvent | None:
+    conn = get_db()
+    cur = conn.cursor(row_factory=dict_row)
+    cur.execute("SELECT * FROM scored_events WHERE raw_event_id = %s", (raw_event_id,))
+    row = cur.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return ScoredEvent(
+        raw_event_id=row["raw_event_id"],
+        event_type=row["event_type"],
+        policy_domain=row["policy_domain"],
+        risk_signal=row["risk_signal"],
+        rate_signal=row["rate_signal"],
+        geo_signal=row["geo_signal"],
+        sector_impacts=row["sector_impacts"],
+        sentiment=row["sentiment"],
+        rationale=row["rationale"],
+        fx_state=row["fx_state"],
+        sector_scores=row["sector_scores"],
+        total_score=row["total_score"],
+        created_at=row["created_at"],
+        channels=row.get("channels") or [],
+        confidence=row.get("confidence", 0.6),
+        regime=row.get("regime") or {},
+        baseline=row.get("baseline") or {},
+    )
 
 
 def list_timeline(limit: int = 50) -> list[dict[str, object]]:

@@ -33,24 +33,39 @@
           <button class="ghost" id="refreshViews">Refresh views</button>
         </div>
         <div class="status" id="status">Idle.</div>
-        <div class="news">
-          <div class="news-title">News</div>
-          <div id="newsList" class="news-list"></div>
+        <div class="hero-columns">
+          <div class="news">
+            <div class="news-title">News</div>
+            <div id="newsList" class="news-list"></div>
+          </div>
+          <aside class="panel insight-panel">
+            <div class="panel-header">
+              <h2>Insight</h2>
+              <span class="hint">Selected news</span>
+            </div>
+            <div class="insight-title" id="insightTitle">선택한 뉴스가 없습니다.</div>
+            <div class="insight-block">
+              <h3>뉴스 요약 (KR)</h3>
+              <p class="insight-body" id="insightSummary">뉴스를 선택하면 한국어 요약이 표시됩니다.</p>
+            </div>
+          <div class="insight-block">
+            <h3>분석 근거</h3>
+            <p class="insight-body" id="insightAnalysis">분석 결과가 아직 없습니다.</p>
+          </div>
+          <div class="insight-block">
+            <h3>FX Forecast 근거</h3>
+            <p class="insight-body" id="insightFx">FX 예측이 아직 없습니다.</p>
+          </div>
+          <div class="insight-block">
+            <h3>Heatmap 근거</h3>
+            <p class="insight-body" id="insightHeatmap">Heatmap 예측이 아직 없습니다.</p>
+          </div>
+          </aside>
         </div>
       </div>
     </header>
 
     <main>
-      <section class="panel fx-panel">
-        <div class="panel-header fx-header">
-          <div>
-            <h2>FX Market Activity by Instrument</h2>
-            <p class="panel-subtitle">Daily average notional value (USD billions)</p>
-          </div>
-        </div>
-        <div id="fxChart" class="fx-chart"></div>
-      </section>
-
       <section class="panel market-heatmap-panel">
         <div class="panel-header">
           <h2>Heatmap</h2>
@@ -112,6 +127,6 @@
       <span>LLM: local Mistral - Storage: Postgres - Source: RapidAPI</span>
     </footer>
 
-    <script src="/static/app.js"></script>
+    <script src="/static/app.js?v=2"></script>
   </body>
 </html>

@@ -10,10 +10,21 @@ from app.config import settings
 from app.ingest.raw_store import fetch_raw_event, fetch_unprocessed_raw_events, save_raw_events
 from app.ingest.apnews import fetch_article_details, fetch_raw_events, get_categories
 from app.llm.normalize import normalize_event
+from app.llm.insight import (
+    build_analysis_reason,
+    build_fx_reason,
+    build_heatmap_reason,
+    generate_analysis_ko,
+    generate_fx_ko,
+    generate_heatmap_ko,
+    summarize_news_ko,
+)
 from app.rules.engine import score_event
 from app.store.db import init_db
 from app.store.event_store import (
     fetch_unscored_events,
+    fetch_normalized_event,
+    fetch_scored_event,
     graph_edges,
     list_timeline,
     reset_scored_data,
@@ -196,6 +207,50 @@ def heatmap() -> dict[str, float]:
 @app.get("/graph")
 def graph(limit: int = 100) -> list[dict[str, object]]:
     return graph_edges(limit=limit)
+
+
+@app.get("/events/insight")
+def event_insight(raw_event_id: str) -> dict[str, str]:
+    logger.info("Insight request raw_event_id=%s", raw_event_id)
+    raw_event = fetch_raw_event(raw_event_id)
+    if not raw_event:
+        logger.warning("Insight missing raw_event_id=%s", raw_event_id)
+        raise HTTPException(status_code=404, detail="Raw event not found")
+
+    normalized = fetch_normalized_event(raw_event_id)
+    scored = fetch_scored_event(raw_event_id)
+    logger.info(
+        "Insight data raw_event_id=%s normalized=%s scored=%s",
+        raw_event_id,
+        bool(normalized),
+        bool(scored),
+    )
+
+    summary_ko = summarize_news_ko(raw_event)
+    if not summary_ko:
+        summary_ko = _news_summary(raw_event.payload) or raw_event.title or "요약 정보가 없습니다."
+
+    analysis_reason = generate_analysis_ko(normalized, scored)
+    if not analysis_reason:
+        analysis_reason = build_analysis_reason(normalized, scored)
+
+    fx_reason = generate_fx_ko(normalized, scored)
+    if not fx_reason:
+        fx_reason = build_fx_reason(normalized, scored)
+
+    heatmap_reason = generate_heatmap_ko(scored, normalized)
+    if not heatmap_reason:
+        heatmap_reason = build_heatmap_reason(scored, normalized)
+
+    return {
+        "id": raw_event.id,
+        "title": raw_event.title,
+        "url": raw_event.url,
+        "summary_ko": summary_ko,
+        "analysis_reason": analysis_reason,
+        "fx_reason": fx_reason,
+        "heatmap_reason": heatmap_reason,
+    }
 
 
 def _news_summary(payload: dict) -> str:

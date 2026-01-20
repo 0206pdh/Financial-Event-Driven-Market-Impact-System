@@ -3,9 +3,13 @@ const runBtn = document.getElementById("runPipeline");
 const refreshBtn = document.getElementById("refreshViews");
 const categorySelect = document.getElementById("categorySelect");
 const newsList = document.getElementById("newsList");
-const fxChartEl = document.getElementById("fxChart");
 const marketHeatmapEl = document.getElementById("marketHeatmap");
 const fxPredictionEl = document.getElementById("fxPrediction");
+const insightTitleEl = document.getElementById("insightTitle");
+const insightSummaryEl = document.getElementById("insightSummary");
+const insightAnalysisEl = document.getElementById("insightAnalysis");
+const insightFxEl = document.getElementById("insightFx");
+const insightHeatmapEl = document.getElementById("insightHeatmap");
 let selectedNewsId = "";
 let lastHeatmapScores = {};
 
@@ -26,6 +30,85 @@ function setRunState() {
   runBtn.disabled = !selectedNewsId;
 }
 
+function setInsightEmpty(message) {
+  if (insightTitleEl) {
+    insightTitleEl.textContent = message || "선택한 뉴스가 없습니다.";
+  }
+  if (insightSummaryEl) {
+    insightSummaryEl.textContent = "뉴스를 선택하면 한국어 요약이 표시됩니다.";
+  }
+  if (insightAnalysisEl) {
+    insightAnalysisEl.textContent = "분석 결과가 아직 없습니다.";
+  }
+  if (insightFxEl) {
+    insightFxEl.textContent = "FX 예측이 아직 없습니다.";
+  }
+  if (insightHeatmapEl) {
+    insightHeatmapEl.textContent = "Heatmap 예측이 아직 없습니다.";
+  }
+}
+
+function renderInsight(data, fallbackTitle) {
+  if (!data) {
+    setInsightEmpty();
+    return;
+  }
+  if (insightTitleEl) {
+    insightTitleEl.textContent = data.title || fallbackTitle || "선택한 뉴스";
+  }
+  if (insightSummaryEl) {
+    insightSummaryEl.textContent = data.summary_ko || data.summary || "요약 정보가 없습니다.";
+  }
+  if (insightAnalysisEl) {
+    insightAnalysisEl.textContent = data.analysis_reason || "분석 결과가 아직 없습니다.";
+  }
+  if (insightFxEl) {
+    insightFxEl.textContent = data.fx_reason || "FX 예측이 아직 없습니다.";
+  }
+  if (insightHeatmapEl) {
+    insightHeatmapEl.textContent = data.heatmap_reason || "Heatmap 예측이 아직 없습니다.";
+  }
+}
+
+async function loadInsight(rawEventId, fallbackTitle) {
+  if (!rawEventId) {
+    setInsightEmpty();
+    return;
+  }
+  setStatus("Loading insight...");
+  console.log("Loading insight for", rawEventId);
+  if (insightSummaryEl) {
+    insightSummaryEl.textContent = "요약 생성 중...";
+  }
+  if (insightAnalysisEl) {
+    insightAnalysisEl.textContent = "분석 근거 불러오는 중...";
+  }
+  if (insightFxEl) {
+    insightFxEl.textContent = "FX 근거 불러오는 중...";
+  }
+  if (insightHeatmapEl) {
+    insightHeatmapEl.textContent = "Heatmap 근거 불러오는 중...";
+  }
+  try {
+    const data = await fetchJson(`/events/insight?raw_event_id=${encodeURIComponent(rawEventId)}`);
+    console.log("Insight response", data);
+    renderInsight(data, fallbackTitle);
+    setStatus("Insight loaded.");
+  } catch (err) {
+    console.error("Insight error", err);
+    renderInsight(
+      {
+        summary_ko: "요약을 불러오지 못했습니다.",
+        analysis_reason: "분석 결과를 불러오지 못했습니다.",
+        fx_reason: "FX 결과를 불러오지 못했습니다.",
+        heatmap_reason: "Heatmap 결과를 불러오지 못했습니다.",
+      },
+      fallbackTitle
+    );
+    setStatus(`Insight error: ${err.message}`);
+  }
+}
+
 function renderNews(items) {
   if (!newsList) {
     return;
@@ -33,6 +116,7 @@ function renderNews(items) {
   newsList.innerHTML = "";
   if (!items || !items.length) {
     newsList.innerHTML = "<div class=\"news-item\">No news items yet.</div>";
+    setInsightEmpty();
     return;
   }
   items.forEach((item) => {
@@ -70,9 +154,20 @@ function renderNews(items) {
         node.classList.toggle("selected", node.dataset.id === item.id);
       });
       setRunState();
+      loadInsight(item.id, item.title);
     });
     newsList.appendChild(el);
   });
+
+  if (!selectedNewsId) {
+    selectedNewsId = items[0].id;
+  }
+  document.querySelectorAll(".news-item").forEach((node) => {
+    node.classList.toggle("selected", node.dataset.id === selectedNewsId);
+  });
+  setRunState();
+  const selectedItem = items.find((item) => item.id === selectedNewsId) || items[0];
+  loadInsight(selectedNewsId, selectedItem?.title);
 }
 
 async function loadNews(category) {
@@ -205,6 +300,9 @@ async function refresh() {
     renderMarketHeatmap(lastHeatmapScores);
     renderFxPrediction(timeline);
     renderCategories(categories);
+    if (selectedNewsId) {
+      loadInsight(selectedNewsId);
+    }
     setStatus("Views refreshed.");
   } catch (err) {
     setStatus(`Error: ${err.message}`);
@@ -230,6 +328,7 @@ runBtn.addEventListener("click", async () => {
 refreshBtn.addEventListener("click", refresh);
 
 refresh();
+setInsightEmpty();
 
 function renderCategories(items) {
   if (categorySelect) {
@@ -252,88 +351,13 @@ if (categorySelect) {
   categorySelect.addEventListener("change", () => {
     selectedNewsId = "";
     setRunState();
+    setInsightEmpty("선택한 뉴스가 없습니다.");
     loadNews(categorySelect.value);
   });
 }
 
 setRunState();
 
-const fxData = [
-  { quarter: "Q1 2023", fxSwaps: 3500, spotFX: 2100, forwards: 900, nonTraditional: 280 },
-  { quarter: "Q2 2023", fxSwaps: 3869, spotFX: 2001, forwards: 987, nonTraditional: 303 },
-  { quarter: "Q3 2023", fxSwaps: 4138, spotFX: 2042, forwards: 1049, nonTraditional: 326 },
-  { quarter: "Q4 2023", fxSwaps: 4234, spotFX: 1731, forwards: 1087, nonTraditional: 344 },
-  { quarter: "Q1 2024", fxSwaps: 4147, spotFX: 1893, forwards: 1114, nonTraditional: 356 },
-  { quarter: "Q2 2024", fxSwaps: 3934, spotFX: 1605, forwards: 1149, nonTraditional: 362 },
-  { quarter: "Q3 2024", fxSwaps: 3691, spotFX: 1760, forwards: 1201, nonTraditional: 362 },
-  { quarter: "Q4 2024", fxSwaps: 3515, spotFX: 1468, forwards: 1264, nonTraditional: 357 },
-  { quarter: "Q1 2025", fxSwaps: 3486, spotFX: 1614, forwards: 1326, nonTraditional: 349 },
-  { quarter: "Q2 2025", fxSwaps: 3622, spotFX: 1325, forwards: 1376, nonTraditional: 337 },
-  { quarter: "Q3 2025", fxSwaps: 3871, spotFX: 1468, forwards: 1404, nonTraditional: 323 },
-  { quarter: "Q4 2025", fxSwaps: 4158, spotFX: 1180, forwards: 1425, nonTraditional: 306 },
-];
-
-function linePath(data, key, width, height, padding) {
-  const maxY = 5000;
-  const minY = 0;
-  const plotWidth = width - padding * 2;
-  const plotHeight = height - padding * 2;
-  return data
-    .map((point, index) => {
-      const x = padding + (plotWidth * index) / (data.length - 1);
-      const value = point[key];
-      const y = padding + plotHeight - ((value - minY) / (maxY - minY)) * plotHeight;
-      return `${index === 0 ? "M" : "L"}${x.toFixed(2)},${y.toFixed(2)}`;
-    })
-    .join(" ");
-}
-
-function renderFxChart() {
-  if (!fxChartEl) {
-    return;
-  }
-  const width = 960;
-  const height = 360;
-  const padding = 48;
-  const yTicks = [0, 1000, 2000, 3000, 4000, 5000];
-  const xLabels = fxData.map((point) => point.quarter);
-  const gridLines = yTicks
-    .map((tick) => {
-      const y = padding + (height - padding * 2) - (tick / 5000) * (height - padding * 2);
-      return `<line x1="${padding}" y1="${y}" x2="${width - padding}" y2="${y}" stroke="#1e2430" stroke-width="1" />`;
-    })
-    .join("");
-  const xTicks = xLabels
-    .map((label, index) => {
-      const x = padding + ((width - padding * 2) * index) / (xLabels.length - 1);
-      return `<text x="${x}" y="${height - 12}" text-anchor="middle" fill="#9aa0a6" font-size="10">${label}</text>`;
-    })
-    .join("");
-  const yLabels = yTicks
-    .map((tick) => {
-      const y = padding + (height - padding * 2) - (tick / 5000) * (height - padding * 2);
-      return `<text x="16" y="${y + 4}" fill="#9aa0a6" font-size="10">${tick}</text>`;
-    })
-    .join("");
-  const svg = `
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="FX Market Activity">
-      ${gridLines}
-      <path d="${linePath(fxData, "fxSwaps", width, height, padding)}" fill="none" stroke="#4a9eff" stroke-width="2.5" />
-      <path d="${linePath(fxData, "spotFX", width, height, padding)}" fill="none" stroke="#ff4a9e" stroke-width="2.5" />
-      <path d="${linePath(fxData, "forwards", width, height, padding)}" fill="none" stroke="#ff9a4a" stroke-width="2.5" />
-      <path d="${linePath(fxData, "nonTraditional", width, height, padding)}" fill="none" stroke="#4aff9e" stroke-width="2.5" />
-      ${xTicks}
-      ${yLabels}
-    </svg>
-    <div class="fx-chart-labels">
-      <span style="color:#4a9eff;">FX swaps</span>
-      <span style="color:#ff4a9e;">Spot</span>
-      <span style="color:#ff9a4a;">Outright forwards</span>
-      <span style="color:#4aff9e;">Non-traditional</span>
-    </div>
-  `;
-  fxChartEl.innerHTML = svg;
-}
 
 function getHeatmapColor(change) {
   if (change >= 2) return "#10b981";
@@ -459,9 +483,7 @@ function renderMarketHeatmap(scores) {
   });
 }
 
-renderFxChart();
 renderMarketHeatmap(lastHeatmapScores);
 window.addEventListener("resize", () => {
-  renderFxChart();
   renderMarketHeatmap(lastHeatmapScores);
 });
