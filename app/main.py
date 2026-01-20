@@ -47,7 +47,7 @@ app.mount("/static", StaticFiles(directory="app/ui"), name="static")
 @app.on_event("startup")
 def _startup() -> None:
     init_db()
-    logger.info("Server running at http://localhost:8000")
+    logger.info("Server running at http://localhost:8010")
 
 
 @app.get("/")
